@@ -289,7 +289,11 @@ if (existing) {
   callInWindow('TappCookie.on', 'change', function (state) { onConsent(state.choices, 'update'); });
   data.gtmOnSuccess();
 } else {
-  const url = data.cmpUrl.replace(/\/$/, '') + '/tappcookie.js';
+  // no regex literal here: the sandboxed JS parser rejects it ("token recognition error at: '\\'")
+  const cmpBase = data.cmpUrl.charAt(data.cmpUrl.length - 1) === '/'
+    ? data.cmpUrl.substring(0, data.cmpUrl.length - 1)
+    : data.cmpUrl;
+  const url = cmpBase + '/tappcookie.js';
   // injectScript cannot set data-* attributes; the SDK therefore also reads window.__tappCookieConfig
   setInWindow('__tappCookieConfig', {
     site: data.siteId, tenant: data.tenantId, cmp: data.cmpUrl,
