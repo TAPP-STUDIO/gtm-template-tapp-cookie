@@ -2,6 +2,6 @@ homepage: "https://tappcookie.cz"
 documentation: "https://github.com/TAPP-STUDIO/gtm-template-tapp-cookie#readme"
 versions:
   - sha: "e228e7d73adf817830f982c65f9423a9657833c5"
-    changeNotes: "Initial version: Consent Mode v2 default from the tapp_consent cookie (all denied for new visitors, wait_for_update), loads tappcookie.js, consent update after every decision, regional defaults, ads_data_redaction and url_passthrough."
+    changeNotes: "Fix: the sandboxed code no longer uses a regular expression literal (the Template Editor rejected the import with a parse error). Test scenario names in English."
   - sha: "e341003cf11c826b05b3da8463a82af4c62b7b0d"
     changeNotes: "Initial version: Consent Mode v2 default from the tapp_consent cookie (all denied for new visitors, wait_for_update), loads tappcookie.js, consent update after every decision, regional defaults, ads_data_redaction and url_passthrough."
