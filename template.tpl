@@ -226,6 +226,13 @@ const denied = {
   analytics_storage: 'denied', functionality_storage: 'denied',
   personalization_storage: 'denied', security_storage: 'granted'
 };
+// Google CMP Partner Program (PLAN E11.1): identify tapp cookie to Google tags. Google asks for
+// this "as early as possible in your template", so it goes before the consent default. The
+// permission is queried first for the same reason as below: a missing write_data_layer would
+// throw and the whole banner would be lost. The keyPatterns already cover developer_id.*.
+if (queryPermission('write_data_layer', 'developer_id.dMjg5OD')) gtagSet('developer_id.dMjg5OD', true);
+else log('tapp cookie: missing write_data_layer permission for developer_id');
+
 if (stored) {
   // `wait_for_update` belongs here too. The template does not know every validity rule the SDK
   // applies (ttlDays/rejectTtlDays expiry, a raised declarationVersion, a timestamp in the
@@ -266,10 +273,6 @@ if (data.urlPassthrough) {
   if (queryPermission('write_data_layer', 'url_passthrough')) gtagSet({ url_passthrough: true });
   else log('tapp cookie: missing write_data_layer permission for url_passthrough');
 }
-// TODO (Google CMP Partner Program): once Google issues a developer ID, add
-// gtagSet('developer_id.<id>', true) here (dot notation as in Google's documentation and
-// published templates); the write_data_layer permission already covers developer_id.*.
-
 // 3) listener for banner decisions: the sandbox has no addEventListener, so the SDK calls a
 // callback registered through TappCookie.on("change").
 const onConsent = function (choices, action) {
