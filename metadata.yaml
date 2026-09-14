@@ -1,6 +1,8 @@
 homepage: "https://tappcookie.cz"
-documentation: "https://github.com/TAPP-STUDIO/gtm-template-tapp-cookie#readme"
+documentation: "https://example.test"
 versions:
+  - sha: "6a82d3d367d22ac6534ef7f3c69cbb3c76c086aa"
+    changeNotes: "Adds the developer ID."
   - sha: "7b3307566a053d9c156f8da3d76a322151e2d00b"
     changeNotes: "Initial version: Consent Mode v2 default from the tapp_consent cookie (all denied for new visitors, wait_for_update), loads tappcookie.js, consent update after every decision, regional defaults, ads_data_redaction and url_passthrough."
   - sha: "e228e7d73adf817830f982c65f9423a9657833c5"
