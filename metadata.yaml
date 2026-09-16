@@ -1,6 +1,8 @@
 homepage: "https://tappcookie.cz"
 documentation: "https://github.com/TAPP-STUDIO/gtm-template-tapp-cookie#readme"
 versions:
+  - sha: "31061e95a4dc94767c485f636af9032cdb649029"
+    changeNotes: "The consent default is now always denied, also for returning visitors; a stored choice from the tapp_consent cookie follows right away with updateConsentState, as in the Google consent API guide."
   - sha: "7b3307566a053d9c156f8da3d76a322151e2d00b"
     changeNotes: "Sets the tapp cookie CMP partner developer ID (Google Consent Mode CMP Partner Program) with gtagSet before the consent default."
   - sha: "e228e7d73adf817830f982c65f9423a9657833c5"
