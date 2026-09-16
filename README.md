@@ -6,11 +6,11 @@ Google Tag Manager.
 
 Fire it on **Consent Initialization – All Pages**. It then:
 
-1. Sets the Consent Mode v2 **default** state. For a returning visitor with a valid stored
-   choice (first-party cookie `tapp_consent`) the default mirrors that choice; for a new visitor
-   everything is `denied` (`security_storage` is always `granted`). Both cases include
-   `wait_for_update`, so tags wait until the banner confirms the choice. Optional regional
-   defaults (`region`) let you grant by default where the banner is not shown.
+1. Sets the Consent Mode v2 **default** state: everything `denied` (`security_storage` is always
+   `granted`) with `wait_for_update`. For a returning visitor with a stored choice (first-party
+   cookie `tapp_consent`) the choice follows right away as `updateConsentState`, so the default
+   never changes after consent and the update carries the choice. Optional regional defaults
+   (`region`) let you grant by default where the banner is not shown.
 2. Sets `ads_data_redaction` and, optionally, `url_passthrough`.
 3. Loads the banner script `tappcookie.js` from the tapp cookie CDN unless the page already
    loaded it in `<head>` (recommended, see below).

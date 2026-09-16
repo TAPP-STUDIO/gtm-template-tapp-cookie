@@ -150,10 +150,12 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
 
 /*
  * tapp cookie CMP - GTM tag template.
- * 1. Consent Mode default from the first-party cookie `tapp_consent` when present, otherwise all
- *    denied - both with wait_for_update. The cookie only says "a decision exists"; its validity
- *    (TTL, declaration version) is checked by tappcookie.js, which sends an update to denied if
- *    the stored choice is no longer valid.
+ * 1. Consent Mode default: always all denied with wait_for_update (plus regional rows). When the
+ *    first-party cookie `tapp_consent` holds a decision, it follows right away as an update, so
+ *    the default never changes after consent and the update carries the choice (Google consent
+ *    API guide). The cookie only says "a decision exists"; its validity (TTL, declaration
+ *    version) is checked by tappcookie.js, which sends an update to denied if the stored choice
+ *    is no longer valid.
  * 2. injectScript tappcookie.js (GTM injects asynchronously, so synchronous auto-blocking is not
  *    possible from here; the recommended setup is to put the script directly in <head> and use
  *    this template for the consent signal only).
@@ -233,34 +235,29 @@ const denied = {
 if (queryPermission('write_data_layer', 'developer_id.dMjg5OD')) gtagSet('developer_id.dMjg5OD', true);
 else log('tapp cookie: missing write_data_layer permission for developer_id');
 
-if (stored) {
-  // `wait_for_update` belongs here too. The template does not know every validity rule the SDK
-  // applies (ttlDays/rejectTtlDays expiry, a raised declarationVersion, a timestamp in the
-  // future), so the stored choice may already be invalid and the SDK will shortly update it to
-  // denied. Without the wait, tags would fire with granted consent before that correction.
-  const fromCookie = stateFromChoices(stored);
-  fromCookie.wait_for_update = makeNumber(data.waitForUpdate) || 500;
-  setDefaultConsentState(fromCookie);
-} else {
-  const base = {};
-  for (const k in denied) base[k] = denied[k];
-  base.wait_for_update = makeNumber(data.waitForUpdate) || 500;
-  // regional exceptions (granted only where the banner does not run)
-  if (data.regionalDefaults && data.regionalDefaults.length) {
-    data.regionalDefaults.forEach(function (row) {
-      const regions = makeString(row.regions).split(',').map(function (r) { return r.trim(); }).filter(function (r) { return r; });
-      if (!regions.length) return;
-      const s = {};
-      for (const k in denied) s[k] = denied[k];
-      s.ad_storage = row.ads; s.ad_user_data = row.ads; s.ad_personalization = row.ads;
-      s.analytics_storage = row.analytics;
-      s.region = regions;
-      s.wait_for_update = base.wait_for_update;
-      setDefaultConsentState(s);
-    });
-  }
-  setDefaultConsentState(base);
+const base = {};
+for (const k in denied) base[k] = denied[k];
+base.wait_for_update = makeNumber(data.waitForUpdate) || 500;
+// regional exceptions (granted only where the banner does not run)
+if (data.regionalDefaults && data.regionalDefaults.length) {
+  data.regionalDefaults.forEach(function (row) {
+    const regions = makeString(row.regions).split(',').map(function (r) { return r.trim(); }).filter(function (r) { return r; });
+    if (!regions.length) return;
+    const s = {};
+    for (const k in denied) s[k] = denied[k];
+    s.ad_storage = row.ads; s.ad_user_data = row.ads; s.ad_personalization = row.ads;
+    s.analytics_storage = row.analytics;
+    s.region = regions;
+    s.wait_for_update = base.wait_for_update;
+    setDefaultConsentState(s);
+  });
 }
+setDefaultConsentState(base);
+// A returning visitor's stored choice is an update, not a different default. The template does
+// not know every validity rule the SDK applies (ttlDays/rejectTtlDays expiry, a raised
+// declarationVersion, a timestamp in the future), so the choice may already be invalid - the SDK
+// then sends an update to denied shortly after it loads.
+if (stored) updateConsentState(stateFromChoices(stored));
 // `gtagSet` needs write_data_layer for every key it writes. If the permission were missing the
 // call would throw - and since the callback registration, __tappCookieConfig and injectScript
 // follow, the whole banner would silently be lost. So the permission is queried first and a
@@ -425,16 +422,21 @@ scenarios:
     mock('injectScript', function (url, ok) { ok(); });
     runCode({ siteId: 'web', tenantId: 'klient', cmpUrl: 'https://cmp.tappcookie.cz', waitForUpdate: 500, adsDataRedaction: true, blocking: 'auto' });
     assertApi('gtmOnSuccess').wasCalled();
-- name: valid cookie -> default from the stored choice
+- name: valid cookie -> default denied, stored choice as update
   code: |-
     mock('getCookieValues', function () { return ['%7B%22v%22%3A1%2C%22id%22%3A%22x%22%2C%22at%22%3A%222026-01-01T00%3A00%3A00.000Z%22%2C%22dv%22%3A1%2C%22c%22%3A%7B%22analytics%22%3Atrue%2C%22marketing%22%3Afalse%2C%22preferences%22%3Afalse%7D%7D']; });
     mock('setDefaultConsentState', function (s) {
-      assertThat(s.analytics_storage).isEqualTo('granted');
+      assertThat(s.analytics_storage).isEqualTo('denied');
       assertThat(s.ad_storage).isEqualTo('denied');
       assertThat(s.wait_for_update).isEqualTo(500);
     });
+    mock('updateConsentState', function (s) {
+      assertThat(s.analytics_storage).isEqualTo('granted');
+      assertThat(s.ad_storage).isEqualTo('denied');
+    });
     mock('injectScript', function (url, ok) { ok(); });
     runCode({ siteId: 'web', tenantId: 'klient', cmpUrl: 'https://cmp.tappcookie.cz', waitForUpdate: 500, blocking: 'auto' });
+    assertApi('updateConsentState').wasCalled();
     assertApi('gtmOnSuccess').wasCalled();
 
 
