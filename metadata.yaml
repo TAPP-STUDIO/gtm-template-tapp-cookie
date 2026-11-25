@@ -1,6 +1,8 @@
 homepage: "https://tappcookie.cz"
 documentation: "https://github.com/TAPP-STUDIO/gtm-template-tapp-cookie#readme"
 versions:
+  - sha: "30ca68eb007e4680c24faa68082c323513482e8f"
+    changeNotes: "Consent is updated and tapp_consent_update is pushed only after a decision in the banner. Opening or closing the settings without a choice no longer sends a denied update before the visitor decides."
   - sha: "31061e95a4dc94767c485f636af9032cdb649029"
     changeNotes: "The consent default is now always denied, also for returning visitors; a stored choice from the tapp_consent cookie follows right away with updateConsentState, as in the Google consent API guide."
   - sha: "7b3307566a053d9c156f8da3d76a322151e2d00b"
