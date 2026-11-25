@@ -217,7 +217,8 @@ function storedChoices() {
   return {
     analytics: best.parsed.c.analytics === true,
     marketing: best.parsed.c.marketing === true,
-    preferences: best.parsed.c.preferences === true
+    preferences: best.parsed.c.preferences === true,
+    at: best.at
   };
 }
 
@@ -283,10 +284,34 @@ const onConsent = function (choices, action) {
     tapp_consent_preferences: choices.preferences === true
   });
 };
+// The SDK emits "change" on every state change, also when the visitor only opens or closes the
+// settings. Only a new decision may update consent and push tapp_consent_update: an update
+// without a choice turned the gcd letters from p (no update) into q (denied by the visitor) and
+// broke the default -> choice -> update order (found on 25 Nov 2026). A decision is told apart by
+// its timestamp (decidedAt is the `at` of the stored cookie), so re-saving the same choices still
+// counts. Opt-out and notice regimes imply the choice without a timestamp: their key is the choice.
+const lastDecision = { key: stored ? 'decided|' + stored.at : '' };
+const decisionKey = function (state) {
+  if (state.status === 'decided') return 'decided|' + makeString(state.decidedAt);
+  if (state.status !== 'implicit') return '';
+  const c = state.choices;
+  return 'implicit|' + makeString(c.analytics === true) + makeString(c.marketing === true) +
+    makeString(c.preferences === true);
+};
+const onChange = function (state) {
+  if (!state || !state.choices) return;
+  const key = decisionKey(state);
+  if (key === lastDecision.key) return;
+  lastDecision.key = key;
+  // no decision (yet or any more): settings only opened or closed, the stored choice expired,
+  // or it was deleted in another tab - the SDK sends that update itself
+  if (!key) return;
+  onConsent(state.choices, 'update');
+};
 // 2) the script (if the site already has it in <head>, only the callback is registered)
 const existing = copyFromWindow('TappCookie');
 if (existing) {
-  callInWindow('TappCookie.on', 'change', function (state) { onConsent(state.choices, 'update'); });
+  callInWindow('TappCookie.on', 'change', onChange);
   data.gtmOnSuccess();
 } else {
   // no regex literal here: the sandboxed JS parser rejects it ("token recognition error at: '\\'")
@@ -306,7 +331,7 @@ if (existing) {
     return;
   }
   injectScript(url, function () {
-    callInWindow('TappCookie.on', 'change', function (state) { onConsent(state.choices, 'update'); });
+    callInWindow('TappCookie.on', 'change', onChange);
     data.gtmOnSuccess();
   }, function () {
     log('tapp cookie: tappcookie.js failed to load, consent stays denied');
@@ -438,6 +463,45 @@ scenarios:
     runCode({ siteId: 'web', tenantId: 'klient', cmpUrl: 'https://cmp.tappcookie.cz', waitForUpdate: 500, blocking: 'auto' });
     assertApi('updateConsentState').wasCalled();
     assertApi('gtmOnSuccess').wasCalled();
+- name: settings opened and closed before a decision -> no consent update, no event
+  code: |-
+    const listener = {};
+    const calls = { update: 0, push: 0 };
+    mock('getCookieValues', function () { return []; });
+    mock('updateConsentState', function () { calls.update = calls.update + 1; });
+    mock('createQueue', function () { return function () { calls.push = calls.push + 1; }; });
+    mock('copyFromWindow', function (name) { return name === 'TappCookie' ? {} : undefined; });
+    mock('callInWindow', function (name, event, cb) { if (name === 'TappCookie.on') listener.cb = cb; });
+    runCode({ siteId: 'web', tenantId: 'klient', cmpUrl: 'https://cmp.tappcookie.cz', waitForUpdate: 500, blocking: 'auto' });
+    const undecided = { status: 'undecided', decidedAt: null, choices: { analytics: false, marketing: false, preferences: false } };
+    listener.cb(undecided);
+    listener.cb(undecided);
+    assertThat(calls.update).isEqualTo(0);
+    assertThat(calls.push).isEqualTo(0);
+    listener.cb({ status: 'decided', decidedAt: '2026-11-25T10:00:00.000Z', choices: { analytics: true, marketing: false, preferences: false } });
+    assertThat(calls.update).isEqualTo(1);
+    assertThat(calls.push).isEqualTo(1);
+    listener.cb({ status: 'decided', decidedAt: '2026-11-25T10:00:00.000Z', choices: { analytics: true, marketing: false, preferences: false } });
+    assertThat(calls.update).isEqualTo(1);
+    assertThat(calls.push).isEqualTo(1);
+- name: returning visitor opens the settings -> no second update, withdrawal -> update
+  code: |-
+    const listener = {};
+    const calls = { update: 0, push: 0, last: null };
+    mock('getCookieValues', function () { return ['%7B%22v%22%3A1%2C%22id%22%3A%22x%22%2C%22at%22%3A%222026-01-01T00%3A00%3A00.000Z%22%2C%22dv%22%3A1%2C%22c%22%3A%7B%22analytics%22%3Atrue%2C%22marketing%22%3Afalse%2C%22preferences%22%3Afalse%7D%7D']; });
+    mock('updateConsentState', function (s) { calls.update = calls.update + 1; calls.last = s; });
+    mock('createQueue', function () { return function () { calls.push = calls.push + 1; }; });
+    mock('copyFromWindow', function (name) { return name === 'TappCookie' ? {} : undefined; });
+    mock('callInWindow', function (name, event, cb) { if (name === 'TappCookie.on') listener.cb = cb; });
+    runCode({ siteId: 'web', tenantId: 'klient', cmpUrl: 'https://cmp.tappcookie.cz', waitForUpdate: 500, blocking: 'auto' });
+    assertThat(calls.update).isEqualTo(1);
+    listener.cb({ status: 'decided', decidedAt: '2026-01-01T00:00:00.000Z', choices: { analytics: true, marketing: false, preferences: false } });
+    assertThat(calls.update).isEqualTo(1);
+    assertThat(calls.push).isEqualTo(0);
+    listener.cb({ status: 'decided', decidedAt: '2026-11-25T10:00:00.000Z', choices: { analytics: false, marketing: false, preferences: false } });
+    assertThat(calls.update).isEqualTo(2);
+    assertThat(calls.push).isEqualTo(1);
+    assertThat(calls.last.analytics_storage).isEqualTo('denied');
 
 
 ___NOTES___

@@ -16,7 +16,8 @@ Fire it on **Consent Initialization – All Pages**. It then:
    loaded it in `<head>` (recommended, see below).
 4. After every decision in the banner calls `updateConsentState` with all seven signals and
    pushes `tapp_consent_update` to the data layer with
-   `tapp_consent_analytics|marketing|preferences` booleans for your own triggers.
+   `tapp_consent_analytics|marketing|preferences` booleans for your own triggers. Opening or
+   closing the settings without a choice sends nothing.
 
 Category → signal mapping: necessary → `security_storage`; analytics → `analytics_storage`;
 marketing → `ad_storage`, `ad_user_data`, `ad_personalization`; preferences →
